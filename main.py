@@ -202,12 +202,13 @@ def generar_graficos_informe(
     ax.set_yticklabels(df_ord["modelo"], fontsize=10)
     ax.set_xlabel("Costo Acumulado en 112 días (Reales Brasileños - BRL)")
     ax.set_title("Descomposición del Costo Económico por Modelo (Quiebre de Stock vs. Almacenamiento)", fontsize=12, fontweight="bold")
-    ax.legend(loc="lower right")
+    ax.legend(loc="upper right", frameon=True)
 
     for i, total in enumerate(df_ord["costo_total_brl"]):
-        ax.text(total + 80, i, f"{total:,.0f} BRL", va="center", fontsize=9.5, fontweight="bold")
+        ax.text(total + 100, i, f"{total:,.0f} BRL", va="center", fontsize=9.5, fontweight="bold")
 
-    ax.set_xlim(0, df_ord["costo_total_brl"].max() * 1.15)
+    ax.set_xlim(0, df_ord["costo_total_brl"].max() * 1.22)
+    
     plt.tight_layout()
     fig.savefig(FIGURES_DIR / "fig3_desglose_costos_brl.png", dpi=300)
     plt.close(fig)
