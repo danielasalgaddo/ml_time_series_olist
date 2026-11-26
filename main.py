@@ -1,3 +1,28 @@
+import subprocess
+import sys
+from pathlib import Path
+
+
+def _relanzar_en_entorno_virtual() -> None:
+    """
+    Si existe un entorno virtual .venv en el proyecto y main.py se ejecutó con otro
+    intérprete (por ejemplo el Python global), relanza el script con el de .venv para
+    usar las versiones fijadas y las dependencias de los modelos fundacionales.
+    """
+    dir_venv = Path(__file__).resolve().parent / ".venv"
+    candidatos = [dir_venv / "Scripts" / "python.exe", dir_venv / "bin" / "python"]
+    python_venv = next((p for p in candidatos if p.exists()), None)
+
+    if python_venv is None or Path(sys.prefix).resolve() == dir_venv:
+        return
+
+    print(f"[Aviso] Relanzando con el entorno virtual del proyecto: {python_venv}", flush=True)
+    sys.exit(subprocess.run([str(python_venv), *sys.argv]).returncode)
+
+
+if __name__ == "__main__":
+    _relanzar_en_entorno_virtual()
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -14,6 +39,7 @@ from src.config import (
 from src.data_builder import construir_serie_diaria_categoria, guardar_serie_procesada
 from src.evaluation import evaluar_predicciones
 from src.features import construir_matriz_features
+from src.models.foundation import modelos_fundacionales_disponibles, predecir_modelos_fundacionales
 from src.models.ml_quantile import entrenar_y_predecir_lightgbm
 from src.models.statistical import entrenar_y_predecir_sarimax, predecir_baseline_empirico
 from src.validation import generar_cortes_walk_forward
@@ -34,6 +60,13 @@ def ejecutar_backtesting_walk_forward(
     registros_diarios = []
     metricas_por_corte = []
     importancias_acumuladas = []
+
+    usar_fundacionales = modelos_fundacionales_disponibles()
+    if not usar_fundacionales:
+        print(
+            "  [Aviso] Chronos-2 y TimesFM 3 omitidos: faltan dependencias opcionales "
+            "(pip install -r requirements-foundation.txt)."
+        )
 
     for num_corte, df_train, df_test in generar_cortes_walk_forward(
         df_features, n_cortes=n_cortes, horizonte_dias=horizonte_dias
@@ -62,6 +95,16 @@ def ejecutar_backtesting_walk_forward(
             "6. LightGBM (Pinball Loss Q80)": preds_lgbm["lgbm_cuantil80"],
             "7. LightGBM (Pinball Q80 + CQR)": preds_lgbm["lgbm_cuantil80_cqr"],
         }
+
+        # 3. Modelos Fundacionales Zero-shot (Chronos-2 y TimesFM 3), crudos y con CQR
+        if usar_fundacionales:
+            preds_fund = predecir_modelos_fundacionales(df_train, df_test)
+            diccionario_modelos.update({
+                "8. Chronos-2 (Zero-shot Q80)": preds_fund["chronos2_cuantil80"],
+                "9. Chronos-2 (Zero-shot Q80 + CQR)": preds_fund["chronos2_cuantil80_cqr"],
+                "10. TimesFM 3 (Zero-shot Q80)": preds_fund["timesfm3_cuantil80"],
+                "11. TimesFM 3 (Zero-shot Q80 + CQR)": preds_fund["timesfm3_cuantil80_cqr"],
+            })
 
         # Evaluar métricas del corte actual
         for nombre_mod, y_hat in diccionario_modelos.items():
@@ -153,16 +196,28 @@ def generar_graficos_informe(
 
     # GRÁFICO 2: El Espejismo del RMSE vs Costo Económico Total (BRL)
     fig, ax = plt.subplots(figsize=(10, 6))
+    desplazamientos_etiquetas = {
+        "8": ((-10, 2), "right"),
+        "9": ((-10, 12), "right"),
+        "10": ((10, -14), "left"),
+        "11": ((10, -3), "left"),
+    }
     for _, fila in df_global.iterrows():
         es_q80 = "Q80" in fila["modelo"] or "0.80" in fila["modelo"]
         color = "#dc2626" if es_q80 else "#2563eb"
         marcador = "D" if es_q80 else "o"
         ax.scatter(fila["RMSE"], fila["costo_total_brl"], color=color, s=130, marker=marcador, zorder=4)
+        # Los modelos fundacionales quedan agrupados: se separan sus etiquetas a mano
+        desplazamiento, alineacion = desplazamientos_etiquetas.get(
+            fila["modelo"].split(".")[0], ((8, 5), "left")
+        )
         ax.annotate(
             fila["modelo"],
             (fila["RMSE"], fila["costo_total_brl"]),
-            xytext=(8, 5),
+            xytext=desplazamiento,
             textcoords="offset points",
+            ha=alineacion,
+            va="center",
             fontsize=9.5,
             fontweight="bold" if es_q80 else "normal",
         )
@@ -202,7 +257,7 @@ def generar_graficos_informe(
     ax.set_yticklabels(df_ord["modelo"], fontsize=10)
     ax.set_xlabel("Costo Acumulado en 112 días (Reales Brasileños - BRL)")
     ax.set_title("Descomposición del Costo Económico por Modelo (Quiebre de Stock vs. Almacenamiento)", fontsize=12, fontweight="bold")
-    ax.legend(loc="upper right", frameon=True)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.11), ncol=2, frameon=True)
 
     for i, total in enumerate(df_ord["costo_total_brl"]):
         ax.text(total + 100, i, f"{total:,.0f} BRL", va="center", fontsize=9.5, fontweight="bold")

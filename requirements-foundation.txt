@@ -1,0 +1,14 @@
+# Dependencias OPCIONALES para los modelos fundacionales (Chronos-2 y TimesFM 3).
+# Instalar DESPUÉS de requirements.txt, respetando sus versiones fijadas:
+#
+#   pip install -r requirements-foundation.txt -c requirements.txt
+#
+# Con GPU NVIDIA, agregar el índice de PyTorch con CUDA para acelerar la inferencia:
+#
+#   pip install -r requirements-foundation.txt -c requirements.txt --extra-index-url https://download.pytorch.org/whl/cu126
+#
+# Los pesos se descargan solos desde Hugging Face en la primera ejecución
+# (amazon/chronos-2 y google/timesfm-3.0-pytorch).
+torch==2.14.1
+chronos-forecasting==2.3.2
+timesfm==3.0.2

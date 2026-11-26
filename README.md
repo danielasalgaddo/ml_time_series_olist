@@ -27,6 +27,20 @@ ml_time_series_olist/
 │   ├── evaluation.py         # Pinball Loss, RMSE, MAE y Costo Económico en BRL
 │   └── models/
 │       ├── statistical.py    # Baseline Empírico y SARIMAX(1,0,1)x(1,0,1,7) con estado Kalman h=1
-│       └── ml_quantile.py    # LightGBM (L2, Q50, Q80) con estacionamiento local y CQR
+│       ├── ml_quantile.py    # LightGBM (L2, Q50, Q80) con estacionamiento local y CQR
+│       └── foundation.py     # Chronos-2 y TimesFM 3 en zero-shot (Q80 crudo y con CQR)
 ├── main.py                   # Punto de entrada único del pipeline completo
-└── requirements.txt          # Dependencias reproducibles
+├── requirements.txt          # Dependencias reproducibles
+└── requirements-foundation.txt  # Dependencias opcionales de los modelos fundacionales
+```
+
+## 3. Modelos Fundacionales (Opcional)
+`main.py` agrega **Chronos-2** (Amazon) y **TimesFM 3** (Google Research) como modelos 8 a 11 si sus dependencias están instaladas; si no, los omite con un aviso y corre los 7 modelos originales.
+
+- Se usan en **zero-shot** (sin entrenamiento), con el mismo protocolo h=1: el contexto es la demanda real hasta t-1 más las variables de calendario que usa SARIMAX.
+- Se reporta el cuantil 0.80 crudo y con el mismo ajuste conforme (CQR) que LightGBM, calibrado en los últimos 28 días de train.
+- Los pesos de TimesFM 3 tienen licencia no comercial. Olist es un dataset público: no se puede descartar que haya formado parte del preentrenamiento de estos modelos.
+
+```text
+pip install -r requirements-foundation.txt -c requirements.txt
+```
